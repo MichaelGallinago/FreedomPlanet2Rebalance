@@ -1,5 +1,9 @@
 using UnityEngine;
 using HarmonyLib;
+using System.Reflection;
+using System;
+using MelonLoader;
+using static Ferr.Path2D;
 
 namespace FP2Rebalance.MichaelGallinago
 {
@@ -21,6 +25,14 @@ namespace FP2Rebalance.MichaelGallinago
 
     class Patcher
     {
+        private static Type playerType = typeof(FPPlayer);
+
+        public static FieldInfo GetPlayerField(string name) => playerType.GetField(name, BindingFlags.NonPublic | BindingFlags.Instance);
+
+        public static void SetPlayerValue(string name, object value, object player = null) => GetPlayerField(name).SetValue(player, value);
+
+        public static object GetPlayerValue(string name, object player = null) => GetPlayerField(name).GetValue(player);
+
         public static FPPlayer GetPlayer => FPStage.currentStage.GetPlayerInstance_FPPlayer();
     }
 
@@ -199,9 +211,12 @@ namespace FP2Rebalance.MichaelGallinago
         static void Postfix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            if (fpPlayer.currentAnimation == "Wings_Loop" && fpPlayer.powerupTimer <= 0f && fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_DragonBoostPt2))
+            if (fpPlayer.currentAnimation == "Wings_Loop" && fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_DragonBoostPt2))
             {
-                fpPlayer.health = FPCommon.RoundToQuantumWithinErrorThreshold(fpPlayer.health - FPStage.deltaTime / 70f, 0.5f);
+                if (fpPlayer.powerupTimer <= 0f)
+                {
+                    fpPlayer.health = FPCommon.RoundToQuantumWithinErrorThreshold(fpPlayer.health - FPStage.deltaTime / 70f, 0.5f);
+                }
             }
         }
     }
@@ -264,6 +279,91 @@ namespace FP2Rebalance.MichaelGallinago
             }
         }
     }
+
+    [HarmonyPatch(typeof(FPPlayer), "Action_Carol_AirMoves")]
+    public class Patch_Action_Carol_AirMoves
+    {
+        static bool Prefix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            if (fpPlayer.input.attackHold && !(fpPlayer.input.attackPress || fpPlayer.state == new FPObjectState(fpPlayer.State_Carol_Punch)
+                || fpPlayer.currentAnimation == "Rolling" || fpPlayer.currentAnimation == "Pounce" || fpPlayer.input.down))
+            {
+                if (fpPlayer.input.up)
+                {
+                    fpPlayer.SetPlayerAnimation("AttackUp", 0f, 0f, false, true);
+                    if (fpPlayer.characterID == FPCharacterID.CAROL)
+                    {
+                        float SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostThreshold = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostThreshold");
+                        float SINGLE_CarolUpAttack_VelocityYBoost_MaxBoostThreshold = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_MaxBoostThreshold");
+                        float SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostMultiplier = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostMultiplier");
+                        float SINGLE_CarolUpAttack_VelocityYBoost_FinalValue = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_FinalValue");
+                        float SINGLE_CarolUpAttack_VelocityYBoost_DecayFinalValue = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_DecayFinalValue");
+                        float SINGLE_CarolUpAttack_VelocityYBoost_DecayDecrement = (float)Patcher.GetPlayerValue("SINGLE_CarolUpAttack_VelocityYBoost_DecayDecrement");
+                        float carolUpAttack_VelocityYBoost_Current = (float)Patcher.GetPlayerValue("carolUpAttack_VelocityYBoost_Current", fpPlayer);
+                        float carolUpAttack_VelocityYBoost_DecayCurrent = (float)Patcher.GetPlayerValue("carolUpAttack_VelocityYBoost_DecayCurrent", fpPlayer);
+
+                        if (fpPlayer.velocity.y < SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostThreshold)
+                        {
+                            fpPlayer.velocity.y = Mathf.Min(SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostThreshold, fpPlayer.velocity.y + carolUpAttack_VelocityYBoost_Current * SINGLE_CarolUpAttack_VelocityYBoost_IncreasedBoostMultiplier);
+                        }
+                        if (fpPlayer.velocity.y < SINGLE_CarolUpAttack_VelocityYBoost_MaxBoostThreshold)
+                        {
+                            fpPlayer.velocity.y = Mathf.Min(SINGLE_CarolUpAttack_VelocityYBoost_MaxBoostThreshold, fpPlayer.velocity.y + carolUpAttack_VelocityYBoost_Current);
+                        }
+                        Patcher.SetPlayerValue("carolUpAttack_VelocityYBoost_Current", Mathf.Max(SINGLE_CarolUpAttack_VelocityYBoost_FinalValue, carolUpAttack_VelocityYBoost_Current - carolUpAttack_VelocityYBoost_DecayCurrent), fpPlayer);
+                        if (carolUpAttack_VelocityYBoost_DecayCurrent > SINGLE_CarolUpAttack_VelocityYBoost_DecayFinalValue)
+                        {
+                            Patcher.SetPlayerValue("carolUpAttack_VelocityYBoost_DecayCurrent", Mathf.Max(SINGLE_CarolUpAttack_VelocityYBoost_DecayFinalValue, carolUpAttack_VelocityYBoost_DecayCurrent - SINGLE_CarolUpAttack_VelocityYBoost_DecayDecrement), fpPlayer);
+                        }
+                    }
+                    fpPlayer.nextAttack = 1;
+                }
+                else if (fpPlayer.nextAttack > 1 && fpPlayer.nextAttack < 4)
+                {
+                    fpPlayer.SetPlayerAnimation("Punch" + fpPlayer.nextAttack, 0f, 0f, false);
+                    fpPlayer.nextAttack ++;
+                }
+                else
+                {
+                    fpPlayer.SetPlayerAnimation("Punch1", 0f, 0f, false);
+                    fpPlayer.nextAttack = 2;
+                }
+
+                fpPlayer.idleTimer = -fpPlayer.fightStanceTime;
+                fpPlayer.state = new FPObjectState(fpPlayer.State_Carol_Punch);
+                //Patcher.GetPlayerField("combo").SetValue(null, false);
+                Patcher.SetPlayerValue("combo", false);
+                return false;
+            }
+            return true;
+        }
+    }
+
+    /*
+    [HarmonyPatch(typeof(FPPlayer), "Action_Carol_GroundMoves")]
+    public class Patch_Action_Carol_GroundMoves
+    {
+        static bool Prefix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            if (fpPlayer.input.attackHold && !(fpPlayer.input.attackPress
+                || fpPlayer.state == new FPObjectState(fpPlayer.State_Carol_Punch)
+                || fpPlayer.currentAnimation == "Rolling" || fpPlayer.currentAnimation == "Pounce"
+                || fpPlayer.input.down || fpPlayer.input.up || fpPlayer.nextAttack <= 1 || fpPlayer.nextAttack >= 4))
+            {
+                fpPlayer.SetPlayerAnimation("Punch" + fpPlayer.nextAttack, 0f, 0f, false, true);
+                fpPlayer.nextAttack++;
+            }
+            fpPlayer.idleTimer = -fpPlayer.fightStanceTime;
+            fpPlayer.state = new FPObjectState(fpPlayer.State_Carol_Punch);
+
+            Type exampleType = typeof(FPPlayer);
+            FieldInfo combo = exampleType.GetField("combo", BindingFlags.NonPublic | BindingFlags.Instance);
+            combo.SetValue(null, false);
+            return false;
+        }
+    }*/
 
     [HarmonyPatch(typeof(FPPlayer), "ApplyGroundForces")]
     public class Patch_ApplyGroundForces
