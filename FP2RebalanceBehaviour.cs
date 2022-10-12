@@ -223,12 +223,14 @@ namespace FP2Rebalance.MichaelGallinago
     [HarmonyPatch(typeof(FPPlayer), "State_Lilac_DragonBoostPt1")]
     public class Patch_State_Lilac_DragonBoostPt1
     {
-        static void Postfix()
+        private static AudioClip SavedVoice = null;
+        static void Prefix()
         {
             var fpPlayer = Patcher.GetPlayer;
+            if (SavedVoice == null) SavedVoice = fpPlayer.vaExtra[0];
             if (fpPlayer.currentAnimation == "Wings_Loop" && fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_DragonBoostPt2))
             {
-                fpPlayer.audioChannel[0].Stop();
+                fpPlayer.vaExtra[0] = UnityEngine.Random.Range(0, 10) >= 9 ? SavedVoice : null;
             }
         }
     }
