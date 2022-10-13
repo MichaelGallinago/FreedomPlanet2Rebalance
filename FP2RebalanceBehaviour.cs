@@ -3,6 +3,8 @@ using HarmonyLib;
 using System.Reflection;
 using System;
 using MelonLoader;
+using System.Security.Permissions;
+using System.Threading;
 
 namespace FP2Rebalance.MichaelGallinago
 {
@@ -202,8 +204,100 @@ namespace FP2Rebalance.MichaelGallinago
         }
     }
 
-    [HarmonyPatch(typeof(FPPlayer), "State_Lilac_DragonBoostPt2")]
+    [HarmonyPatch(typeof(FPPlayer), "Action_MillaCubeSpawn")]
+    public class Patch_Action_MillaCubeSpawn
+    {
+        static bool Prefix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            if (fpPlayer.state == new FPObjectState(fpPlayer.State_Milla_ShieldRelease) && (bool)Patcher.GetPlayerValue("useSpecialItem", fpPlayer))
+            {
+                fpPlayer.millaCubeEnergy = 50f;
+            }
+            else
+            {
+                fpPlayer.millaCubeEnergy = 100f;
+            }
+            if (fpPlayer.cubeSpawned)
+            {
+                int num = 0;
+                FPBaseObject fpbaseObject = null;
+                while (FPStage.ForEach(MillaMasterCube.classID, ref fpbaseObject))
+                {
+                    if (((MillaMasterCube)fpbaseObject).parentObject == fpPlayer) num++;
+                }
+                if (num < 3f)
+                {
+                    MillaMasterCube millaMasterCube = (MillaMasterCube)FPStage.CreateStageObject(MillaMasterCube.classID, fpPlayer.position.x, fpPlayer.position.y);
+                    millaMasterCube.parentObject = fpPlayer;
+                    millaMasterCube.cubeSpawnID = num;
+                    millaMasterCube.floatStep = (float)num * -30f;
+                }
+            }
+            else
+            {
+                MillaMasterCube millaMasterCube = (MillaMasterCube)FPStage.CreateStageObject(MillaMasterCube.classID, fpPlayer.position.x, fpPlayer.position.y);
+                millaMasterCube.parentObject = fpPlayer;
+                fpPlayer.cubeSpawned = true;
+            }
+            fpPlayer.Action_PlaySoundUninterruptable(fpPlayer.sfxMillaCubeSpawn);
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(MillaCube), "ObjectCreated")]
+    public class Patch_ObjectCreated
+    {
+        static void Postfix(ref float ___explodeTimer)
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            int num = 0;
+            FPBaseObject fpbaseObject = null;
+            while (FPStage.ForEach(MillaMasterCube.classID, ref fpbaseObject))
+            {
+                if (((MillaMasterCube)fpbaseObject).parentObject == fpPlayer) num++;
+            }
+            ___explodeTimer = 15f + num * 3f + fpPlayer.millaCubeEnergy / 33f;
+        }
+    }
+
+    [HarmonyPatch(typeof(FPPlayer), "State_Milla_Shield")]
+    public class Patch_State_Milla_Shield
+    {
+        private static float spawnBulletTimer = 0f;
+        static void Postfix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            spawnBulletTimer += FPStage.deltaTime;
+            if (spawnBulletTimer > 4f && fpPlayer.input.specialHold && !fpPlayer.input.attackHold)
+            {
+                spawnBulletTimer = 0f;
+                if (fpPlayer.onGround)
+                {
+                    string text = fpPlayer.currentAnimation;
+                    fpPlayer.currentAnimation = string.Empty;
+                    fpPlayer.animator.Play(text, -1, 0f);
+                    fpPlayer.SetPlayerAnimation(text, 0f, 0f, false, true);
+                }
+                FPBaseObject fpbaseObject = null;
+                while (FPStage.ForEach(MillaShield.classID, ref fpbaseObject))
+                {
+                    MillaShield millaShield = (MillaShield)fpbaseObject;
+                    if (millaShield.parentObject == fpPlayer)
+                    {
+                        millaShield.burst = true;
+                    }
+                }
+                fpPlayer.directionLockScriptside = true;
+                fpPlayer.state = new FPObjectState(fpPlayer.State_Milla_ShieldRelease);
+                fpPlayer.idleTimer = -fpPlayer.fightStanceTime;
+                fpPlayer.Action_PlaySoundUninterruptable(fpPlayer.sfxMillaShieldFire);
+            }
+        }
+    }
+
     /*
+    [HarmonyPatch(typeof(FPPlayer), "State_Lilac_DragonBoostPt2")]
     public class Patch_State_Lilac_DragonBoostPt2
     {
         static void Postfix()
