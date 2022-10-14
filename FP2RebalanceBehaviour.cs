@@ -648,7 +648,11 @@ namespace FP2Rebalance.MichaelGallinago
             var fpPlayer = Patcher.GetPlayer;
             if (fpPlayer.characterID == FPCharacterID.NEERA && fpPlayer.energyRecoverRateCurrent < 0f)
             {
-                fpPlayer.powerupTimer += 60f;
+                fpPlayer.powerupTimer += 30f;
+                fpPlayer.acceleration = fpPlayer.GetPlayerStat_Default_Acceleration() * 2f;
+                fpPlayer.deceleration = fpPlayer.GetPlayerStat_Default_Deceleration() * 2f;
+                fpPlayer.airAceleration = fpPlayer.GetPlayerStat_Default_AirAceleration() * 2f;
+                Patcher.SetPlayerValue("speedMultiplier", 2f + (float)fpPlayer.potions[6] * 0.05f, fpPlayer);
             }
         }
     }
