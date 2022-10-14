@@ -5,6 +5,7 @@ using System;
 using MelonLoader;
 using System.Security.Permissions;
 using System.Threading;
+using UnityEngine.SocialPlatforms;
 
 namespace FP2Rebalance.MichaelGallinago
 {
@@ -53,11 +54,11 @@ namespace FP2Rebalance.MichaelGallinago
             var fpPlayer = Patcher.GetPlayer;
             if (fpPlayer.characterID == FPCharacterID.NEERA && fpPlayer.energy >= 100f && fpPlayer.powerupTimer == 30f)
             {
-                if (FPStage.prevGameSpeed == 1f)
-                {
-                    FPStage.SetGameSpeed(0.7f);
-                }
                 fpPlayer.energyRecoverRateCurrent = -0.3f;
+                fpPlayer.acceleration = fpPlayer.GetPlayerStat_Default_Acceleration() * 2f;
+                fpPlayer.deceleration = fpPlayer.GetPlayerStat_Default_Deceleration() * 2f;
+                fpPlayer.airAceleration = fpPlayer.GetPlayerStat_Default_AirAceleration() * 2f;
+                Patcher.SetPlayerValue("speedMultiplier", 2f + (float)fpPlayer.potions[6] * 0.05f, fpPlayer);
             }
         }
     }
@@ -112,10 +113,6 @@ namespace FP2Rebalance.MichaelGallinago
             }
             if (!zero || fpPlayer.energy <= 0f)
             {
-                if (FPStage.prevGameSpeed == 0.7f)
-                {
-                    FPStage.SetGameSpeed(1f);
-                }
                 fpPlayer.energyRecoverRateCurrent = fpPlayer.energyRecoverRate / 4f;
             }
             return false;
@@ -125,38 +122,52 @@ namespace FP2Rebalance.MichaelGallinago
     [HarmonyPatch(typeof(FPPlayer), "Action_Neera_GroundMoves")]
     public class Patch_Action_Neera_GroundMoves
     {
-        private static float savedEnergy;
+        private static float savedEnergy = -1f;
 
         static void Prefix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            savedEnergy = fpPlayer.energy;
-            fpPlayer.energy += 50f;
+            if (fpPlayer.energyRecoverRateCurrent >= 0f)
+            {
+                savedEnergy = fpPlayer.energy;
+                fpPlayer.energy += 50f;
+            }
         }
 
         static void Postfix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            fpPlayer.energy = fpPlayer.energy == 0 ? savedEnergy - 50f : savedEnergy;
+            if (savedEnergy != -1f)
+            {
+                fpPlayer.energy = fpPlayer.energy == 0 ? savedEnergy - 50f : savedEnergy;
+                savedEnergy = -1f;
+            }
         }
     }
 
     [HarmonyPatch(typeof(FPPlayer), "Action_Neera_AirMoves")]
     public class Patch_Action_Neera_AirMoves
     {
-        private static float savedEnergy;
+        private static float savedEnergy = -1f;
 
         static void Prefix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            savedEnergy = fpPlayer.energy;
-            fpPlayer.energy += 50f;
+            if (fpPlayer.energyRecoverRateCurrent >= 0f)
+            {
+                savedEnergy = fpPlayer.energy;
+                fpPlayer.energy += 50f;
+            }
         }
 
         static void Postfix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            fpPlayer.energy = fpPlayer.energy == 0 ? savedEnergy - 50f : savedEnergy;
+            if (savedEnergy != -1f)
+            {
+                fpPlayer.energy = fpPlayer.energy == 0 ? savedEnergy - 50f : savedEnergy;
+                savedEnergy = -1f;
+            }
 
             if ((fpPlayer.powerupTimer > 0f || fpPlayer.energyRecoverRateCurrent < 0f) && fpPlayer.state == new FPObjectState(fpPlayer.State_Neera_AttackForward))
             {
@@ -171,7 +182,7 @@ namespace FP2Rebalance.MichaelGallinago
         static void Postfix()
         {
             var fpPlayer = Patcher.GetPlayer;
-            if (!fpPlayer.onGround && fpPlayer.state == new FPObjectState(fpPlayer.State_Neera_AttackForward) && (fpPlayer.powerupTimer > 0f || fpPlayer.energyRecoverRateCurrent < 0f))
+            if (!fpPlayer.onGround && fpPlayer.state == new FPObjectState(fpPlayer.State_Neera_AttackForward))
             {
                 fpPlayer.jumpAbilityFlag = false;
             }
@@ -188,6 +199,41 @@ namespace FP2Rebalance.MichaelGallinago
             {
                 fpPlayer.velocity.y = -12f;
             }
+        }
+    }
+
+    [HarmonyPatch(typeof(FPPlayer), "Action_NeeraProjectile")]
+    public class Patch_Action_NeeraProjectile
+    {
+        static bool Prefix(RuntimeAnimatorController projectileAnimator)
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            float offsetY = 8f;
+            float offsetX = 0f;
+            if (fpPlayer.currentAnimation == "CrouchAttack_Loop")
+            {
+                offsetY = -8f;
+                offsetX = 24f;
+            }
+            ProjectileBasic projectileBasic;
+            float sign = (fpPlayer.direction == FPDirection.FACING_LEFT ? 1 : -1);
+            for (var angleOffset = -45f; angleOffset < 90f; angleOffset += 45f)
+            {
+                float angle = fpPlayer.angle + angleOffset;
+                projectileBasic = (ProjectileBasic)FPStage.CreateStageObject(ProjectileBasic.classID, fpPlayer.position.x - sign * Mathf.Cos(0.017453292f * fpPlayer.angle) * (80f + offsetX) + Mathf.Sin(0.017453292f * fpPlayer.angle) * offsetY, fpPlayer.position.y + Mathf.Cos(0.017453292f * fpPlayer.angle) * offsetY - sign * Mathf.Sin(0.017453292f * fpPlayer.angle) * (80f + offsetX));
+                projectileBasic.velocity.x = Mathf.Cos(0.017453292f * angle) * (-20f * sign);
+                projectileBasic.velocity.y = Mathf.Sin(0.017453292f * angle) * (-20f * sign);
+                projectileBasic.animatorController = projectileAnimator;
+                projectileBasic.animator = projectileBasic.GetComponent<Animator>();
+                projectileBasic.animator.runtimeAnimatorController = projectileBasic.animatorController;
+                projectileBasic.direction = fpPlayer.direction;
+                projectileBasic.angle = angle;
+                projectileBasic.explodeType = FPExplodeType.WHITEBURST;
+                projectileBasic.sfxExplode = null;
+                projectileBasic.parentObject = fpPlayer;
+                projectileBasic.faction = fpPlayer.faction;
+            }
+            return false;
         }
     }
 
@@ -296,13 +342,87 @@ namespace FP2Rebalance.MichaelGallinago
         }
     }
 
-    /*
     [HarmonyPatch(typeof(FPPlayer), "State_Lilac_DragonBoostPt2")]
     public class Patch_State_Lilac_DragonBoostPt2
     {
-        static void Postfix()
+        static void Prefix()
         {
             var fpPlayer = Patcher.GetPlayer;
+            if (fpPlayer.input.up)
+            {
+                fpPlayer.specialAttackDirection = 0;
+            }
+            else if (fpPlayer.input.down)
+            {
+                fpPlayer.specialAttackDirection = 1;
+            }
+            else if (fpPlayer.input.left)
+            {
+                fpPlayer.specialAttackDirection = 2;
+            }
+            else if (fpPlayer.input.right)
+            {
+                fpPlayer.specialAttackDirection = 2;
+            }
+
+            switch (fpPlayer.specialAttackDirection)
+            {
+                case 0:
+                    if (fpPlayer.direction == FPDirection.FACING_LEFT)
+                    {
+                        fpPlayer.velocity.x = Mathf.Min(Mathf.Min(fpPlayer.recoveryTimer, 0f) * 0.3f - 12f, fpPlayer.recoveryTimer);
+                    }
+                    else
+                    {
+                        fpPlayer.velocity.x = Mathf.Max(Mathf.Max(fpPlayer.recoveryTimer, 0f) * 0.3f + 12f, fpPlayer.recoveryTimer);
+                    }
+                    fpPlayer.velocity.y = 12f;
+                    fpPlayer.onGround = false;
+                    break;
+                case 1:
+                    if (fpPlayer.direction == FPDirection.FACING_LEFT)
+                    {
+                        fpPlayer.velocity.x = Mathf.Min(Mathf.Min(fpPlayer.recoveryTimer, 0f) * 0.3f - 12f, fpPlayer.recoveryTimer);
+                    }
+                    else
+                    {
+                        fpPlayer.velocity.x = Mathf.Max(Mathf.Max(fpPlayer.recoveryTimer, 0f) * 0.3f + 12f, fpPlayer.recoveryTimer);
+                    }
+                    fpPlayer.velocity.y = -12f;
+                    fpPlayer.onGround = false;
+                    break;
+                case 2:
+                    if (fpPlayer.onGround)
+                    {
+                        if (fpPlayer.direction == FPDirection.FACING_LEFT)
+                        {
+                            fpPlayer.groundVel = Mathf.Min(Mathf.Min(fpPlayer.groundVel, 0f) * 0.5f - 15f, fpPlayer.groundVel);
+                        }
+                        else
+                        {
+                            fpPlayer.groundVel = Mathf.Max(Mathf.Max(fpPlayer.groundVel, 0f) * 0.5f + 15f, fpPlayer.groundVel);
+                        }
+                    }
+                    else if (fpPlayer.direction == FPDirection.FACING_LEFT)
+                    {
+                        fpPlayer.velocity.x = Mathf.Min(Mathf.Min(fpPlayer.velocity.x, 0f) * 0.5f - 15f, fpPlayer.velocity.x);
+                        fpPlayer.velocity.y = 0f;
+                    }
+                    else
+                    {
+                        fpPlayer.velocity.x = Mathf.Max(Mathf.Max(fpPlayer.velocity.x, 0f) * 0.5f + 15f, fpPlayer.velocity.x);
+                        fpPlayer.velocity.y = 0f;
+                    }
+                    break;
+            }
+        }
+
+
+        static void Postfix()
+        {
+            /*
+            var fpPlayer = Patcher.GetPlayer;
+            /*
             if (fpPlayer.currentAnimation == "Wings_Loop" && fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_DragonBoostPt2))
             {
                 if (fpPlayer.powerupTimer <= 0f)
@@ -310,9 +430,14 @@ namespace FP2Rebalance.MichaelGallinago
                     fpPlayer.health = FPCommon.RoundToQuantumWithinErrorThreshold(fpPlayer.health - FPStage.deltaTime / 70f, 0.5f);
                 }
             }
+            */
+            /*
+            if (fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_Glide))
+            {
+
+            }*/
         }
     }
-    */
 
     [HarmonyPatch(typeof(FPPlayer), "State_Lilac_DragonBoostPt1")]
     public class Patch_State_Lilac_DragonBoostPt1
@@ -322,7 +447,7 @@ namespace FP2Rebalance.MichaelGallinago
         {
             var fpPlayer = Patcher.GetPlayer;
             if (SavedVoice == null) SavedVoice = fpPlayer.vaExtra[0];
-            if (fpPlayer.currentAnimation == "Wings_Loop" && fpPlayer.state == new FPObjectState(fpPlayer.State_Lilac_DragonBoostPt2))
+            if (fpPlayer.genericTimer < 30f)
             {
                 fpPlayer.vaExtra[0] = UnityEngine.Random.Range(0, 10) >= 9 ? SavedVoice : null;
             }
@@ -484,7 +609,7 @@ namespace FP2Rebalance.MichaelGallinago
             else if (fpPlayer.characterID == FPCharacterID.BIKECAROL && fpPlayer.currentAnimation == "Crouching")
             {
                 var acceleration = 1f - Mathf.Sin(fpPlayer.groundAngle * 0.017453292f) / 32f * ((fpPlayer.groundVel > 0f) ? 1f : -1f) * FPStage.deltaTime;
-                fpPlayer.groundVel *= acceleration * (acceleration > 1f ? 1.004f: 0.998f);
+                fpPlayer.groundVel *= acceleration * (acceleration > 1f ? 1.004f : 0.998f);
             }
         }
     }
@@ -511,6 +636,19 @@ namespace FP2Rebalance.MichaelGallinago
             if (fpPlayer.characterID == FPCharacterID.LILAC)
             {
                 fpPlayer.hasSpecialItem = false;
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(FPPlayer), "Action_Guard")]
+    public class Patch_Action_Guard
+    {
+        static void Prefix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            if (fpPlayer.characterID == FPCharacterID.NEERA && fpPlayer.energyRecoverRateCurrent < 0f)
+            {
+                fpPlayer.powerupTimer += 60f;
             }
         }
     }
