@@ -34,6 +34,18 @@ namespace FP2Rebalance.MichaelGallinago
         public static object GetPlayerValue(string name, object player = null) => GetPlayerField(name).GetValue(player);
 
         public static FPPlayer GetPlayer => FPStage.currentStage.GetPlayerInstance_FPPlayer();
+
+        public static int GetMillaCubeNumber()
+        {
+            int num = 0;
+            var fpPlayer = Patcher.GetPlayer;
+            FPBaseObject fpbaseObject = null;
+            while (FPStage.ForEach(MillaMasterCube.classID, ref fpbaseObject))
+            {
+                if (((MillaMasterCube)fpbaseObject).parentObject == fpPlayer) num++;
+            }
+            return num;
+        }
     }
 
     [HarmonyPatch(typeof(FPPlayer), "Start")]
@@ -266,12 +278,7 @@ namespace FP2Rebalance.MichaelGallinago
             }
             if (fpPlayer.cubeSpawned)
             {
-                int num = 0;
-                FPBaseObject fpbaseObject = null;
-                while (FPStage.ForEach(MillaMasterCube.classID, ref fpbaseObject))
-                {
-                    if (((MillaMasterCube)fpbaseObject).parentObject == fpPlayer) num++;
-                }
+                int num = Patcher.GetMillaCubeNumber();
                 if (num < 3f)
                 {
                     MillaMasterCube millaMasterCube = (MillaMasterCube)FPStage.CreateStageObject(MillaMasterCube.classID, fpPlayer.position.x, fpPlayer.position.y);
@@ -297,13 +304,7 @@ namespace FP2Rebalance.MichaelGallinago
         static void Postfix(ref float ___explodeTimer)
         {
             var fpPlayer = Patcher.GetPlayer;
-            int num = 0;
-            FPBaseObject fpbaseObject = null;
-            while (FPStage.ForEach(MillaMasterCube.classID, ref fpbaseObject))
-            {
-                if (((MillaMasterCube)fpbaseObject).parentObject == fpPlayer) num++;
-            }
-            ___explodeTimer = 15f + num * 3f + fpPlayer.millaCubeEnergy / 33f;
+            ___explodeTimer = 15f + Patcher.GetMillaCubeNumber() * 3f + fpPlayer.millaCubeEnergy / 33f;
         }
     }
 
@@ -311,11 +312,20 @@ namespace FP2Rebalance.MichaelGallinago
     public class Patch_State_Milla_Shield
     {
         private static float spawnBulletTimer = 0f;
+        private static bool savedInput;
+        static void Prefix()
+        {
+            var fpPlayer = Patcher.GetPlayer;
+            savedInput = fpPlayer.input.specialHold;
+            fpPlayer.input.specialHold = true;
+        }
+
         static void Postfix()
         {
             var fpPlayer = Patcher.GetPlayer;
+            fpPlayer.input.specialHold = savedInput;
             spawnBulletTimer += FPStage.deltaTime;
-            if (spawnBulletTimer > 4f && fpPlayer.input.specialHold && !fpPlayer.input.attackHold)
+            if (spawnBulletTimer > 5f - Mathf.Min(Patcher.GetMillaCubeNumber(), 3f) + (fpPlayer.onGround ? 0f : 3f) && !(fpPlayer.input.specialHold && fpPlayer.input.attackHold))
             {
                 spawnBulletTimer = 0f;
                 if (fpPlayer.onGround)

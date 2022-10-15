@@ -12,7 +12,7 @@ namespace FP2Rebalance.MichaelGallinago
 
         public const string Author = "Michael Gallinago"; // Author of the Mod.  (MUST BE SET)
         public const string Company = null; // Company that made the Mod.  (Set as null if none)
-        public const string Version = "1.6.1"; // Version of the Mod.  (MUST BE SET)
+        public const string Version = "1.6.2"; // Version of the Mod.  (MUST BE SET)
         public const string DownloadLink = "https://github.com/MichaelGallinago/FreedomPlanet2Rebalance"; // Download Link for the Mod.  (Set as null if none)
     }
 
