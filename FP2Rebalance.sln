@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.3.32922.545
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FP2Rebalance", "FP2Rebalance.csproj", "{C1CD31C6-7D4B-40B3-A130-FD667E56F2AD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C1CD31C6-7D4B-40B3-A130-FD667E56F2AD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1CD31C6-7D4B-40B3-A130-FD667E56F2AD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1CD31C6-7D4B-40B3-A130-FD667E56F2AD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1CD31C6-7D4B-40B3-A130-FD667E56F2AD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0EBE4750-EE1A-4D13-989E-6EC41AE58EEA}
+	EndGlobalSection
+EndGlobal
