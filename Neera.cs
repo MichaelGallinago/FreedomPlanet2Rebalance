@@ -146,6 +146,7 @@ namespace FP2Rebalance
                 var fpPlayer = Patcher.GetPlayer;
                 if (fpPlayer.currentAnimation == "AirAttackDown" && fpPlayer.input.attackPress && fpPlayer.velocity.y > -12f && fpPlayer.energy >= 25f)
                 {
+                    FPCamera.stageCamera.screenShake = Mathf.Max(FPCamera.stageCamera.screenShake, 10f);
                     fpPlayer.Energy_Restore(-25f);
                     fpPlayer.velocity.y = -15f;
                 }
@@ -153,6 +154,7 @@ namespace FP2Rebalance
                 if (fpPlayer.velocity.y <= -12f)
                 {
                     fpPlayer.attackPower = -fpPlayer.velocity.y - 2f;
+                    fpPlayer.invincibilityTime = Mathf.Max(2f, fpPlayer.invincibilityTime);
                     if (Mathf.Repeat(timer += FPStage.deltaTime, 4f) < 1f)
                     {
                         FPStage.CreateStageObject(Sparkle.classID, fpPlayer.position.x + Random.Range(-24f, 24f), fpPlayer.position.y + Random.Range(-24f, 24f));
