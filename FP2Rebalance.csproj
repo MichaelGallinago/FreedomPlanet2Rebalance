@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net462</TargetFramework>
+    <TargetFramework>net35</TargetFramework>
     <AssemblyName>FP2Rebalance</AssemblyName>
     <Description>Mod that changes the balance of the game</Description>
     <Version>1.6.3</Version>
