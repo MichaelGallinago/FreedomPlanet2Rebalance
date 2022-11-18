@@ -140,11 +140,28 @@ namespace FP2Rebalance
         [HarmonyPatch(typeof(FPPlayer), "State_Neera_AttackForward")]
         public class State_Neera_AttackForward
         {
+            private static float timer = 0;
             static void Postfix()
             {
                 var fpPlayer = Patcher.GetPlayer;
-                if (fpPlayer.currentAnimation == "AirAttackDown" && fpPlayer.input.attackPress)
-                    fpPlayer.velocity.y = -12f;
+                if (fpPlayer.currentAnimation == "AirAttackDown" && fpPlayer.input.attackPress && fpPlayer.velocity.y > -12f && fpPlayer.energy >= 25f)
+                {
+                    fpPlayer.Energy_Restore(-25f);
+                    fpPlayer.velocity.y = -15f;
+                }
+
+                if (fpPlayer.velocity.y <= -12f)
+                {
+                    fpPlayer.attackPower = -fpPlayer.velocity.y - 2f;
+                    if (Mathf.Repeat(timer += FPStage.deltaTime, 4f) < 1f)
+                    {
+                        FPStage.CreateStageObject(Sparkle.classID, fpPlayer.position.x + Random.Range(-24f, 24f), fpPlayer.position.y + Random.Range(-24f, 24f));
+                    }
+                }
+                else
+                {
+                    timer = 0;
+                }
             }
         }
 

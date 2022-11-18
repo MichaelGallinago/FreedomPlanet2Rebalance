@@ -61,7 +61,7 @@ namespace FP2Rebalance
             {
                 var fpPlayer = Patcher.GetPlayer;
                 var cubeNumber = Patcher.GetMillaCubeNumber();
-                __instance.damage /= (1f + 0.5f - Math.Max(cubeNumber * 0.1f, 0.5f));
+                __instance.damage /= (1.6f - Math.Max(cubeNumber * 0.1f, 0.5f));
                 ___explodeTimer = 15f + (cubeNumber * 3f + fpPlayer.millaCubeEnergy / 33f) * Plugin.FireRangeMultiplier.Value;
             }
         }
@@ -88,7 +88,8 @@ namespace FP2Rebalance
                 fpPlayer.input.specialHold = savedInput;
                 spawnBulletTimer += FPStage.deltaTime;
 
-                if (spawnBulletTimer > 5f - Mathf.Min(Patcher.GetMillaCubeNumber(), 3f) + (fpPlayer.onGround ? 0f : 3f) && !(fpPlayer.input.specialHold && fpPlayer.input.attackHold))
+                if (!(fpPlayer.input.specialHold && fpPlayer.input.attackHold) && (fpPlayer.input.attackHold ||
+                    fpPlayer.input.specialHold && spawnBulletTimer > 5f - Mathf.Min(Patcher.GetMillaCubeNumber(), 3f) + (fpPlayer.onGround ? 0f : 3f)))
                 {
                     spawnBulletTimer = 0f;
                     if (fpPlayer.onGround)
