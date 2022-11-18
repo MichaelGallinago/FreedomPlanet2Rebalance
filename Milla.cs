@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using System;
 using UnityEngine;
 
 namespace FP2Rebalance
@@ -56,10 +57,12 @@ namespace FP2Rebalance
         [HarmonyPatch(typeof(MillaCube), "ObjectCreated")]
         public class ObjectCreated
         {
-            static void Postfix(ref float ___explodeTimer)
+            static void Postfix(ref float ___explodeTimer, ref MillaCube __instance)
             {
                 var fpPlayer = Patcher.GetPlayer;
-                ___explodeTimer = 15f + (Patcher.GetMillaCubeNumber() * 3f + fpPlayer.millaCubeEnergy / 33f) * Plugin.FireRangeMultiplier.Value;
+                var cubeNumber = Patcher.GetMillaCubeNumber();
+                __instance.damage /= (1f + 0.5f - Math.Max(cubeNumber * 0.1f, 0.5f));
+                ___explodeTimer = 15f + (cubeNumber * 3f + fpPlayer.millaCubeEnergy / 33f) * Plugin.FireRangeMultiplier.Value;
             }
         }
 
@@ -84,6 +87,7 @@ namespace FP2Rebalance
 
                 fpPlayer.input.specialHold = savedInput;
                 spawnBulletTimer += FPStage.deltaTime;
+
                 if (spawnBulletTimer > 5f - Mathf.Min(Patcher.GetMillaCubeNumber(), 3f) + (fpPlayer.onGround ? 0f : 3f) && !(fpPlayer.input.specialHold && fpPlayer.input.attackHold))
                 {
                     spawnBulletTimer = 0f;
@@ -94,19 +98,51 @@ namespace FP2Rebalance
                         fpPlayer.animator.Play(text, -1, 0f);
                         fpPlayer.SetPlayerAnimation(text, 0f, 0f, false, true);
                     }
+
+                    int count = 0;
+                    bool playSound = false;
+                    bool cameraShake = false;
                     FPBaseObject fpbaseObject = null;
                     while (FPStage.ForEach(MillaShield.classID, ref fpbaseObject))
                     {
                         MillaShield millaShield = (MillaShield)fpbaseObject;
                         if (millaShield.parentObject == fpPlayer)
                         {
-                            millaShield.burst = true;
+                            if (!fpPlayer.input.attackHold && millaShield.superShield || !millaShield.superShield)
+                            {
+                                millaShield.burst = true;
+                                playSound = true;
+                                if (millaShield.superShield)
+                                {
+                                    cameraShake = true;
+                                }
+                                millaShield.attackPower /= 1.75f;
+                            }
+                            else
+                            {
+                                count++;
+                            }
                         }
                     }
+
+                    if (playSound)
+                    {
+                        fpPlayer.Action_PlaySoundUninterruptable(fpPlayer.sfxMillaShieldFire);
+                    }
+
+                    if (cameraShake)
+                    {
+                        FPCamera.stageCamera.screenShake = Mathf.Max(FPCamera.stageCamera.screenShake, 10f);
+                    }
+
+                    if (count > 0)
+                    {
+                        return;
+                    }
+
                     fpPlayer.directionLockScriptside = true;
                     fpPlayer.state = new FPObjectState(fpPlayer.State_Milla_ShieldRelease);
                     fpPlayer.idleTimer = -fpPlayer.fightStanceTime;
-                    fpPlayer.Action_PlaySoundUninterruptable(fpPlayer.sfxMillaShieldFire);
                 }
             }
         }

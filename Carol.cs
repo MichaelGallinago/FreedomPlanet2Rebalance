@@ -5,9 +5,6 @@ namespace FP2Rebalance
 {
     public class Carol
     {
-        public static bool CanWarp { get; set; } = true;
-        public static CarolJumpDisc previousJumpDisc { get; set; } = null;
-
         public static void Patch()
         {
             if (!Plugin.CarolRebalance.Value) return;
@@ -15,8 +12,6 @@ namespace FP2Rebalance
 
             if (Plugin.DiscCansel.Value)
             {
-                //harmony.PatchAll(typeof(State_Carol_JumpDiscThrow));
-                //harmony.PatchAll(typeof(Action_Carol_JumpDiscWarp));
                 harmony.PatchAll(typeof(State_Carol_JumpDiscWarp));
             }
 
@@ -32,25 +27,6 @@ namespace FP2Rebalance
             }
         }
     }
-    /*
-    [HarmonyPatch(typeof(FPPlayer), "State_Carol_JumpDiscThrow")]
-    public class State_Carol_JumpDiscThrow
-    {
-        static void Postfix()
-        {
-            Carol.CanWarp = true;
-        }
-    }
-
-    [HarmonyPatch(typeof(FPPlayer), "Action_Carol_JumpDiscWarp")]
-    public class Action_Carol_JumpDiscWarp
-    {
-        static bool prefix(ref bool __result)
-        {
-            __result = false;
-            return Carol.CanWarp;
-        }
-    }*/
 
     [HarmonyPatch(typeof(FPPlayer), "State_Carol_JumpDiscWarp")]
     public class State_Carol_JumpDiscWarp
@@ -99,8 +75,6 @@ namespace FP2Rebalance
             if (virtualGenericTime <= 0f && fpPlayer.guardTime <= 0f && fpPlayer.input.guardHold)
             {
                 fpPlayer.state = new FPObjectState(fpPlayer.State_InAir);
-                //Carol.previousJumpDisc = fpPlayer.carolJumpDisc;
-                //Carol.CanWarp = false;
                 fpPlayer.carolJumpDisc.parentHasWarpedSuccessfully = true;
                 fpPlayer.genericTimer = 0;
                 fpPlayer.velocity *= 1.2f;
